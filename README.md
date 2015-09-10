@@ -74,6 +74,37 @@ Now names not rooted in `example.com` will fail to resolve:
     root@4d15342387b0:/# ping github.com
     ping: unknown host github.com
 
+To add static host name, use the `--record` option:
+
+    % docker run --name dns -v /var/run/docker.sock:/docker.sock phensley/docker-dns \
+        --domain example.com --record test:172.17.0.100
+
+	$ nslookup test.example.com 172.17.0.3 (dns container ip)
+	Server:		172.17.0.3
+	Address:	172.17.0.3#53
+
+	Name:	test.example.com
+	Address: 172.17.0.100
+
+To add external static host name, use the `--record-external` option:
+
+    % docker run --name dns -v /var/run/docker.sock:/docker.sock phensley/docker-dns \
+        --domain example.com --record-external www.montoto.org:10.0.0.5
+
+	$ nslookup www.montoto.org 172.17.0.3 (dns container ip)
+	Server:		172.17.0.3
+	Address:	172.17.0.3#53
+
+	Name:	www.montoto.org
+	Address: 10.0.0.5
+
+	$ nslookup www.montoto.org 8.8.8.8
+	Server:		8.8.8.8
+	Address:	8.8.8.8#53
+
+	Non-authoritative answer:
+	Name:	www.montoto.org
+	Address: 212.89.28.201
 
 License
 -------
