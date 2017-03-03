@@ -17,7 +17,7 @@ Run some containers:
 
 Start up dockerdns:
 
-    % docker run --name dns -v /var/run/docker.sock:/docker.sock phensley/docker-dns \
+    % docker run --name dns -v /var/run/docker.sock:/docker.sock jamgocoop/docker-dns \
         --domain example.com
 
 Start more containers:
@@ -30,6 +30,21 @@ Check dockerdns logs:
     2014-10-08T20:45:37.349161 [dockerdns] table.add dns.example.com -> 172.17.0.3
     2014-10-08T20:45:37.351574 [dockerdns] table.add foo.example.com -> 172.17.0.2
     2014-10-08T20:45:37.351574 [dockerdns] table.add bar.example.com -> 172.17.0.4
+
+Start up dockerdns with multiple domains:
+
+    % docker run --name dns -v /var/run/docker.sock:/docker.sock jamgocoop/docker-dns \
+        --domain example.com alias.com
+
+Check dockerdns logs:
+
+    % docker logs dns
+    2014-10-08T20:45:37.349161 [dockerdns] table.add dns.example.com -> 172.17.0.3
+    2014-10-08T20:45:37.349161 [dockerdns] table.add dns.alias.com -> 172.17.0.3
+    2014-10-08T20:45:37.351574 [dockerdns] table.add foo.example.com -> 172.17.0.2
+    2014-10-08T20:45:37.351574 [dockerdns] table.add foo.alias.com -> 172.17.0.2
+    2014-10-08T20:45:37.351574 [dockerdns] table.add bar.example.com -> 172.17.0.4
+    2014-10-08T20:45:37.351574 [dockerdns] table.add bar.alias.com -> 172.17.0.4
 
 Query for the containers by hostname:
 
@@ -64,7 +79,7 @@ Names not rooted in `example.com` will be resolved recursively using Google's re
 
 To disable recursive resolution, use the `--no-recursion` flag:
 
-    % docker run --name dns -v /var/run/docker.sock:/docker.sock phensley/docker-dns \
+    % docker run --name dns -v /var/run/docker.sock:/docker.sock jamgocoop/docker-dns \
         --domain example.com --no-recursion
 
 Now names not rooted in `example.com` will fail to resolve:
@@ -76,7 +91,7 @@ Now names not rooted in `example.com` will fail to resolve:
 
 To add static host name, use the `--record` option:
 
-    % docker run --name dns -v /var/run/docker.sock:/docker.sock phensley/docker-dns \
+    % docker run --name dns -v /var/run/docker.sock:/docker.sock jamgocoop/docker-dns \
         --domain example.com --record test:172.17.0.100
 
 	$ nslookup test.example.com 172.17.0.3 (dns container ip)
@@ -88,7 +103,7 @@ To add static host name, use the `--record` option:
 
 To add external static host name, use the `--record-external` option:
 
-    % docker run --name dns -v /var/run/docker.sock:/docker.sock phensley/docker-dns \
+    % docker run --name dns -v /var/run/docker.sock:/docker.sock jamgocoop/docker-dns \
         --domain example.com --record-external www.montoto.org:10.0.0.5
 
 	$ nslookup www.montoto.org 172.17.0.3 (dns container ip)
