@@ -222,7 +222,10 @@ class DockerMonitor(object):
     state = get(rec, 'State', 'Running')
     ip_address = get(rec, 'NetworkSettings', 'IPAddress')
 
-    return [ Container(id_, name, state, ip_address) for name in self._get_names(name, labels) ]
+    if ip_address is not None:
+      return [ Container(id_, name, state, ip_address) for name in self._get_names(name, labels) ]
+    else:
+      return []
 
 
 class DnsServer(DatagramServer):
@@ -341,7 +344,7 @@ def main():
     for k, v in args.record:
        table.add(k + "." + eachDomain, v)
     for k, v in args.record_external:
-       table.add(k + "." + eachDomain, v)
+       table.add(k, v)
   monitor = DockerMonitor(docker.Client(args.docker, version='auto'), table, args.domain)
   dns = DnsServer(args.dns_bind, table, resolver)
   gevent.signal(signal.SIGINT, stop, dns)
