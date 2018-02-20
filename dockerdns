@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-
 # dockerdns - simple, automatic, self-contained dns server for docker
-
 
 # python 3 compatibility
 from __future__ import print_function
@@ -37,7 +35,6 @@ from gevent import socket, threading
 from gevent.server import DatagramServer
 from gevent.resolver_ares import Resolver
 
-
 PROCESS = 'dockerdns'
 DOCKER_SOCK = 'unix:///docker.sock'
 DNS_BINDADDR = '0.0.0.0:53'
@@ -48,7 +45,6 @@ QUIET = 0
 EPILOG = '''
 
 '''
-
 
 Container = namedtuple('Container', 'id, name, running, addr')
 
@@ -129,10 +125,11 @@ class DockerMonitor(object):
 
   'Reads events from Docker and updates the name table'
 
-  def __init__(self, client, table, domains):
+  def __init__(self, client, table, domains, nginx_proxy):
     self._docker = client
     self._table = table
     self._domains = domains
+    self._nginx_proxy = nginx_proxy
 
   def run(self):
     # start the event poller, but don't read from the stream yet
@@ -211,6 +208,10 @@ class DockerMonitor(object):
     # get full details on this container from docker
     rec = self._docker.inspect_container(cid)
 
+    # is domain managed by a proxy?
+    if (self._nginx_proxy != None):
+      self._check_proxy_address(rec)
+
     # ensure name is valid, and append our domain
     name = get(rec, 'Name')
     if not name:
@@ -227,6 +228,12 @@ class DockerMonitor(object):
     else:
       return []
 
+  def _check_proxy_address(self, rec):
+    env_vars = dict(token.split('=', 1) for token in get(rec, 'Config', 'Env'))
+    virtual_host = env_vars.get('VIRTUAL_HOST', None)
+    if virtual_host != None:
+      proxy_rec = self._docker.inspect_container(self._nginx_proxy)
+      rec['NetworkSettings']['IPAddress'] = proxy_rec['NetworkSettings']['IPAddress']
 
 class DnsServer(DatagramServer):
 
@@ -251,7 +258,7 @@ class DnsServer(DatagramServer):
       if addr:
         auth = True
         if rec.q.qtype == QTYPE.AAAA:
-          addr=None
+          addr = None
       else:
         addr = self._resolve('.'.join(rec.q.qname.label))
     self.socket.sendto(self._reply(rec, auth, addr), peer)
@@ -279,6 +286,7 @@ def stop(*servers):
       svr.stop()
   sys.exit(signal.SIGINT)
 
+
 def splitrecord(rec):
   m = re.match('([a-zA-Z0-9_-]*):((?:[12]?[0-9]{1,2}\.){3}(?:[12]?[0-9]{1,2}){1}$)', rec)
   if not m:
@@ -286,6 +294,7 @@ def splitrecord(rec):
     sys.exit(1)
   else:
     return (m.group(1), m.group(2))
+
 
 def splitrecordexternal(rec):
   m = re.match('([a-zA-Z0-9\._-]*):((?:[12]?[0-9]{1,2}\.){3}(?:[12]?[0-9]{1,2}){1}$)', rec)
@@ -295,13 +304,15 @@ def splitrecordexternal(rec):
   else:
     return (m.group(1), m.group(2))
 
+
 def check(args):
   url = urlparse(args.docker)
-  if url.scheme in ('unix','unix+http'):
+  if url.scheme in ('unix', 'unix+http'):
     # check if the socket file exists
     if not os.path.exists(url.path):
       log('unix socket %r does not exist', url.path)
       sys.exit(1)
+
 
 def parse_args():
   docker_url = os.environ.get('DOCKER_HOST')
@@ -319,6 +330,8 @@ def parse_args():
     help='Servers for recursive DNS resolution')
   parser.add_argument('--no-recursion', action='store_const', const=1,
     help='Disables recursive DNS queries')
+  parser.add_argument('--nginx-proxy', default=None,
+    help='Bind address for DNS server')
   parser.add_argument('-q', '--quiet', action='store_const', const=1,
     help='Quiet mode')
   parser.add_argument('-r', '--record', nargs="*", default=[],
@@ -345,7 +358,7 @@ def main():
        table.add(k + "." + eachDomain, v)
     for k, v in args.record_external:
        table.add(k, v)
-  monitor = DockerMonitor(docker.Client(args.docker, version='auto'), table, args.domain)
+  monitor = DockerMonitor(docker.Client(args.docker, version='auto'), table, args.domain, args.nginx_proxy)
   dns = DnsServer(args.dns_bind, table, resolver)
   gevent.signal(signal.SIGINT, stop, dns)
   dns.start()
